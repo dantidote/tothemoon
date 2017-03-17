@@ -3,6 +3,7 @@
 use REST::Client;
 use JSON;
 use MIME::Base64;
+use Data::Dumper;
 use Digest::SHA qw(hmac_sha384_hex);
 
 my $amountToBuyInUsd = '3.33';
@@ -25,6 +26,7 @@ my $apiKey = <$fh>;
 chomp $apiKey;
 close $fh;
 
+checkFunds();
 buyBtc();
 
 sub getNonce(){
@@ -33,6 +35,46 @@ sub getNonce(){
  chomp $nonce;
  return $nonce;
 
+}
+
+sub checkFunds(){
+
+ my $nonce = getNonce();
+ 
+ my $payload = qq(
+ {
+    "request": "/v1/balances",
+    "nonce": $nonce
+ }
+ );
+
+ if($debug){ print "$payload\n"; }
+ $enc_payload = encode_base64($payload,"");
+
+ my $client = REST::Client->new();
+ $client->setHost($host);
+
+ $client->addHeader('X-GEMINI-APIKEY', $apiKey);
+ $client->addHeader('X-GEMINI-PAYLOAD', $enc_payload);
+ $client->addHeader('X-GEMINI-SIGNATURE', hmac_sha384_hex($enc_payload,$apiSecret));
+
+ $client->POST('/v1/balances');
+
+ my $res = $client->responseContent();
+
+ my $wallets = from_json( $res );
+ 
+ #Can't guarantee the array order. Must iterate through to find the USD wallet.
+ foreach $wallet (@$wallets){
+  if( $wallet->{currency} eq "USD" ){
+    if( $wallet->{available} > $amountToBuyInUsd ){
+      return 0;
+    }
+    else{
+      die "not enough USD";
+    }
+  }
+ }
 }
 
 sub getAskPrice(){
@@ -46,7 +88,14 @@ sub getAskPrice(){
  my $res = $client->responseContent();
 
  $resObj = from_json( $res );
- return $resObj->{ask};
+ my $ask = $resObj->{ask};
+ 
+ #sanity
+ if( $ask < 500 || $ask > 2000 ){
+   die "Asking Price OutOfBounds"; 
+ }
+ 
+ return $ask;
 
 }
 
@@ -57,7 +106,7 @@ sub buyBtc{
 
  $amount = sprintf("%.8f", $amountToBuyInUsd / $price) ;
 
- $payload = qq(
+ my $payload = qq(
  {
     "request": "/v1/order/new",
     "nonce": $nonce,
@@ -70,7 +119,7 @@ sub buyBtc{
  );
 
 
- print "$payload\n";
+ if($debug){ print "$payload\n"; }
  $enc_payload = encode_base64($payload,"");
 
  my $client = REST::Client->new();
