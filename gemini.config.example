@@ -1,0 +1,8 @@
+amountToBuyInUsd	5.00
+maxBTCToKeep		0.05
+address			1MD8ZTnXExioGDkfWT9iDT6knjpmwYwnyd
+
+apiKey			APIKEY
+apiSecret		SECRET
+host			https://api.gemini.com
+
