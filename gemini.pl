@@ -7,14 +7,19 @@ use Data::Dumper;
 use Config::Simple;
 use Digest::SHA qw(hmac_sha384_hex);
 use Sys::Syslog;
+use Cwd 'abs_path';
+
+my $scriptDir = abs_path($0) =~ s/[^\/]+$//r ;
 
 my $configFile = 'gemini.config';
+
+my $configFile = $scriptDir . $configFile;
 
 my $debug = 1;
 
 openlog("GEMINI", 'ndelay,pid', "local0");
 
-Config::Simple->import_from($configFile, \%config);
+Config::Simple->import_from($configFile, \%config) or die;
 
 my $amountToBuyInUsd = $config{'amountToBuyInUsd'};
 my $address = $config{'address'};
@@ -40,7 +45,7 @@ sub withdrawBTC{
  my $amt = shift;
  my $nonce = getNonce();
 
- if($debug){ print "Withdrawing $amt BTC\n" }
+ syslog("info", "Withdrawing $amt BTC");
 
  my $payload = qq(
  {
@@ -51,7 +56,7 @@ sub withdrawBTC{
  }
  );
 
- if($debug){ print "$payload\n"; }
+ if($debug){ print $payload ;}
  $enc_payload = encode_base64($payload,"");
 
  my $client = REST::Client->new();
@@ -79,7 +84,7 @@ sub checkFunds(){
  }
  );
 
- if($debug){ print "$payload\n"; }
+ if($debug){ print $payload ;}
  $enc_payload = encode_base64($payload,"");
 
  my $client = REST::Client->new();
@@ -98,9 +103,9 @@ sub checkFunds(){
  #Can't guarantee the array order. Must iterate through to find the correct wallet.
  foreach $wallet (@$wallets){
   if( $wallet->{currency} eq "USD" ){
-    if($debug){ print "Current USD Balance: $wallet->{available}\n"};
+    syslog("info", "Current USD Balance: $wallet->{available}");
     if( $wallet->{available} > $amountToBuyInUsd ){
-      if($debug){ print "We have enough USD to buy BTC\n" }
+      syslog("info", "We have enough USD to buy BTC");
       return 0;
     }
     else{
@@ -108,13 +113,13 @@ sub checkFunds(){
     }
   }
   elsif( $wallet->{currency} eq "BTC" ){
-    if($debug){ print "Current BTC Balance: $wallet->{available}\n"};
+    syslog("info", "Current BTC Balance: $wallet->{available}");
     if( $wallet->{available} > $maxBTC ){
-      if($debug){ print "Balance is greater than threshold.\n" }
+      syslog("info",  "Balance is greater than threshold.");
       withdrawBTC( $wallet->{available} );
     }
     else{
-      if($debug){ print "Not withdrawing BTC because your balance isn't greater than $maxBTC\n" }
+      syslog("info",  "Not withdrawing BTC because your balance isn't greater than $maxBTC");
     }
   }
 
@@ -163,7 +168,7 @@ sub buyBtc{
  );
 
 
- if($debug){ print "$payload\n"; }
+ if($debug){ print $payload ;}
  $enc_payload = encode_base64($payload,"");
 
  my $client = REST::Client->new();
@@ -175,7 +180,11 @@ sub buyBtc{
  $client->setHost($host);
 
  $client->POST('/v1/order/new');
-
- print $client->responseContent();
-
+ if( $client->responseCode == 200 ){
+   syslog("info", "Purchase Complete");
+ }
+ else{
+   syslog("error", "Purchase Failed");
+   print $client->responseContent();
+ }
 }
