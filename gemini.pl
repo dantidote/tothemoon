@@ -113,10 +113,10 @@ sub checkFunds(){
     }
   }
   elsif( $wallet->{currency} eq "BTC" ){
-    syslog("info", "Current BTC Balance: $wallet->{available}");
-    if( $wallet->{available} > $maxBTC ){
+    syslog("info", "Current BTC Balance: $wallet->{availableForWithdrawal}");
+    if( $wallet->{availableForWithdrawal} > $maxBTC ){
       syslog("info",  "Balance is greater than threshold.");
-      withdrawBTC( $wallet->{available} );
+      withdrawBTC( $wallet->{availableForWithdrawal} );
     }
     else{
       syslog("info",  "Not withdrawing BTC because your balance isn't greater than $maxBTC");
