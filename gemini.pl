@@ -21,7 +21,8 @@ openlog("GEMINI", 'ndelay,pid', "local0");
 
 Config::Simple->import_from($configFile, \%config) or die;
 
-my $amountToBuyInUsd = $config{'amountToBuyInUsd'};
+my $btcToBuyInUsd = $config{'btcToBuyInUsd'};
+my $ethToBuyInUsd = $config{'ethToBuyInUsd'};
 my $address = $config{'address'};
 my $host = $config{'host'};
 my $apiSecret = $config{'apiSecret'};
@@ -31,9 +32,9 @@ my $email = $config{'email'};
 my $lowFundAmt = $config{'lowFundAmt'};
 
 
-
 checkFunds();
 buyBtc();
+buyEth();
 
 sub getNonce(){
 
@@ -112,7 +113,7 @@ sub checkFunds(){
       system("mail -s \"Gemini Funds Low\" $email ");
     }
 
-    if( $wallet->{available} > $amountToBuyInUsd ){
+    if( $wallet->{available} > $btcToBuyInUsd+$ethToBuyInUsd ){
       syslog("info", "We have enough USD to buy BTC");
       return 0;
     }
@@ -134,13 +135,14 @@ sub checkFunds(){
  }
 }
 
-sub getAskPrice(){
-
+sub getAskPrice{
+ my $currency = shift;
  my $client = REST::Client->new();
 
  $client->setHost($host);
-
- $client->GET('/v1/pubticker/btcusd');
+ if( $currency eq "BTC" ){ $client->GET('/v1/pubticker/btcusd') }
+ elsif( $currency eq "ETH" ){ $client->GET('/v1/pubticker/ethusd') }
+ else{ syslog("error", "No valid currency specified when getting ask price.") }
 
  my $res = $client->responseContent();
 
@@ -148,10 +150,10 @@ sub getAskPrice(){
  my $ask = $resObj->{ask};
  
  #sanity
- if( $ask < 500 || $ask > 20000 ){
-   syslog("info",  "Price out of bounds: $ask ");
-   die "Asking Price OutOfBounds"; 
- }
+# if( $ask < 500 || $ask > 20000 ){
+#   syslog("info",  "Price out of bounds: $ask ");
+#   die "Asking Price OutOfBounds"; 
+# }
  
  return $ask;
 
@@ -160,9 +162,9 @@ sub getAskPrice(){
 sub buyBtc{
 
  my $nonce = getNonce();
- my $price = getAskPrice();
+ my $price = getAskPrice("BTC");
 
- $amount = sprintf("%.8f", $amountToBuyInUsd / $price) ;
+ my $amount = sprintf("%.8f", $btcToBuyInUsd / $price) ;
 
  my $payload = qq(
  {
@@ -194,6 +196,49 @@ sub buyBtc{
  }
  else{
    syslog("error", "Purchase Failed");
+   print $client->responseContent();
+ }
+}
+
+
+
+sub buyEth{
+
+ my $nonce = getNonce();
+ my $price = getAskPrice('ETH');
+
+ my $amount = sprintf("%.6f", $ethToBuyInUsd / $price) ;
+
+ my $payload = qq(
+ {
+    "request": "/v1/order/new",
+    "nonce": $nonce,
+    "symbol": "ethusd",
+    "amount": "$amount",
+    "price": "$price",
+    "side": "buy",
+    "type": "exchange limit"
+ }
+ );
+
+
+ if($debug){ print $payload ;}
+ $enc_payload = encode_base64($payload,"");
+
+ my $client = REST::Client->new();
+
+ $client->addHeader('X-GEMINI-APIKEY', $apiKey);
+ $client->addHeader('X-GEMINI-PAYLOAD', $enc_payload);
+ $client->addHeader('X-GEMINI-SIGNATURE', hmac_sha384_hex($enc_payload,$apiSecret));
+
+ $client->setHost($host);
+
+ $client->POST('/v1/order/new');
+ if( $client->responseCode == 200 ){
+   syslog("info", "Purchase Complete");
+ }
+ else{
+   syslog("err", "Purchase Failed");
    print $client->responseContent();
  }
 }
