@@ -1,6 +1,8 @@
-amountToBuyInUsd	5.00
+btcToBuyInUsd		5.00
 maxBTCToKeep		0.05
 address			1MD8ZTnXExioGDkfWT9iDT6knjpmwYwnyd
+
+ethToBuyInUsd           2.00
 
 apiKey			APIKEY
 apiSecret		SECRET
