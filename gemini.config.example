@@ -6,3 +6,5 @@ apiKey			APIKEY
 apiSecret		SECRET
 host			https://api.gemini.com
 
+email			test@test.com
+lowFundAmt		100

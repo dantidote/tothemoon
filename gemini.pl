@@ -27,6 +27,10 @@ my $host = $config{'host'};
 my $apiSecret = $config{'apiSecret'};
 my $apiKey = $config{'apiKey'};
 my $maxBTC = $config{'maxBTCToKeep'};
+my $email = $config{'email'};
+my $lowFundAmt = $config{'lowFundAmt'};
+
+
 
 checkFunds();
 buyBtc();
@@ -104,6 +108,10 @@ sub checkFunds(){
  foreach $wallet (@$wallets){
   if( $wallet->{currency} eq "USD" ){
     syslog("info", "Current USD Balance: $wallet->{available}");
+     if( $wallet->{available} < $lowFundAmt ){
+      system("mail -s \"Gemini Funds Low\" $email ");
+    }
+
     if( $wallet->{available} > $amountToBuyInUsd ){
       syslog("info", "We have enough USD to buy BTC");
       return 0;
@@ -140,7 +148,8 @@ sub getAskPrice(){
  my $ask = $resObj->{ask};
  
  #sanity
- if( $ask < 500 || $ask > 2000 ){
+ if( $ask < 500 || $ask > 20000 ){
+   syslog("info",  "Price out of bounds: $ask ");
    die "Asking Price OutOfBounds"; 
  }
  
