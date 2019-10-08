@@ -162,7 +162,7 @@ sub getAskPrice{
 sub buyBtc{
 
  my $nonce = getNonce();
- my $price = getAskPrice("BTC");
+ my $price = getAskPrice("BTC") - 1;
 
  my $amount = sprintf("%.8f", $btcToBuyInUsd / $price) ;
 
@@ -205,7 +205,7 @@ sub buyBtc{
 sub buyEth{
 
  my $nonce = getNonce();
- my $price = getAskPrice('ETH');
+ my $price = getAskPrice('ETH') - 1 ;
 
  my $amount = sprintf("%.6f", $ethToBuyInUsd / $price) ;
 
